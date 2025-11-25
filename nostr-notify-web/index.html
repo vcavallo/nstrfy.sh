@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nostr Notify - Web Receiver</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#6200EE">
+    <link rel="icon" type="image/png" href="icon-192.png">
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <header>
+            <h1>📬 Nostr Notify</h1>
+            <p class="subtitle">Receive encrypted notifications over Nostr</p>
+            <div class="status-bar">
+                <span id="status-indicator" class="status-indicator status-disconnected"></span>
+                <span id="status-text">Disconnected</span>
+            </div>
+        </header>
+
+        <!-- Setup Section -->
+        <section id="setup-section" class="card">
+            <h2>⚙️ Setup</h2>
+            
+            <div class="form-group">
+                <label for="private-key">Private Key (64 hex characters)</label>
+                <div class="input-with-button">
+                    <input 
+                        type="password" 
+                        id="private-key" 
+                        placeholder="Enter your private key or generate a new one"
+                        class="mono-input">
+                    <button id="toggle-key-visibility" class="icon-button" title="Show/Hide Key">
+                        👁️
+                    </button>
+                </div>
+            </div>
+
+            <div class="button-group">
+                <button id="generate-key" class="btn btn-secondary">
+                    🎲 Generate New Key
+                </button>
+                <button id="show-pubkey" class="btn btn-secondary">
+                    🔑 Show Public Key
+                </button>
+            </div>
+
+            <div id="pubkey-display" class="info-box hidden">
+                <h3>Your Public Key (npub)</h3>
+                <div class="pubkey-container">
+                    <code id="npub-text"></code>
+                    <button id="copy-npub" class="icon-button" title="Copy to clipboard">
+                        📋
+                    </button>
+                </div>
+                <p class="help-text">Share this with people who want to send you notifications</p>
+            </div>
+
+            <div class="form-group">
+                <label for="relays">Relays (one per line)</label>
+                <textarea 
+                    id="relays" 
+                    rows="4" 
+                    class="mono-input"
+                    placeholder="wss://relay.damus.io&#10;wss://nos.lol&#10;wss://relay.nostr.band">wss://relay.damus.io
+wss://nos.lol
+wss://relay.nostr.band
+wss://relay.primal.net</textarea>
+            </div>
+
+            <div class="button-group">
+                <button id="save-settings" class="btn btn-primary">
+                    💾 Save Settings
+                </button>
+                <button id="start-listening" class="btn btn-success" disabled>
+                    ▶️ Start Listening
+                </button>
+                <button id="stop-listening" class="btn btn-danger hidden">
+                    ⏹️ Stop Listening
+                </button>
+            </div>
+        </section>
+
+        <!-- Stats Section -->
+        <section class="card stats-section">
+            <div class="stat-item">
+                <span class="stat-label">Connected Relays</span>
+                <span id="connected-relays" class="stat-value">0</span>
+            </div>
+            <div class="stat-item">
+                <span class="stat-label">Notifications Received</span>
+                <span id="notification-count" class="stat-value">0</span>
+            </div>
+            <div class="stat-item">
+                <span class="stat-label">Uptime</span>
+                <span id="uptime" class="stat-value">--:--:--</span>
+            </div>
+        </section>
+
+        <!-- Notifications Section -->
+        <section class="card">
+            <div class="section-header">
+                <h2>📨 Recent Notifications</h2>
+                <button id="clear-notifications" class="btn btn-small">
+                    🗑️ Clear
+                </button>
+            </div>
+            <div id="notifications-list" class="notifications-list">
+                <div class="empty-state">
+                    <p>No notifications yet</p>
+                    <p class="help-text">Start listening to receive notifications</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- Instructions Section -->
+        <section class="card instructions">
+            <h2>📖 Instructions</h2>
+            <ol>
+                <li><strong>Generate or import your private key</strong> - This is your identity</li>
+                <li><strong>Show your public key (npub)</strong> - Share this with senders</li>
+                <li><strong>Configure relays</strong> - Default relays work well for most users</li>
+                <li><strong>Save settings</strong> - Your key and preferences are stored locally</li>
+                <li><strong>Start listening</strong> - The app will connect to relays and listen for notifications</li>
+                <li><strong>Grant notification permission</strong> - Allow browser notifications when prompted</li>
+            </ol>
+            
+            <h3>🧪 Test it!</h3>
+            <p>Send a test notification from your computer:</p>
+            <pre><code>nostr-notify --to YOUR_NPUB \
+  --title "Test Notification" \
+  --priority high \
+  "Hello from the CLI!"</code></pre>
+        </section>
+
+        <!-- Footer -->
+        <footer>
+            <p>
+                <a href="https://github.com/yourusername/nostr-notify" target="_blank">GitHub</a> |
+                <a href="#" id="install-pwa">Install as App</a> |
+                <a href="#" id="test-notification">Test Notification</a>
+            </p>
+            <p class="help-text">Open source • End-to-end encrypted • Decentralized</p>
+        </footer>
+    </div>
+
+    <!-- Toast Container -->
+    <div id="toast-container"></div>
+
+    <!-- Scripts -->
+    <script type="module" src="app.js"></script>
+</body>
+</html>

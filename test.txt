@@ -1,0 +1,19 @@
+
+```unset
+./nstrfy.sh generate
+✓ nak found: /opt/homebrew/bin/nak
+ℹ Generating new private key...
+
+✓ Key generated!
+Private key (hex): e9279cf0e7f49246861f93f460cc63d7076fe26a3d4d32b3ccfe4959ee696e06
+Public key (hex):  cf0c3edb6ef6c01ca4f519c207f82dbfe9ab7b59b6d8a6dbf82b3e2089c7c535
+Public key (npub): npub1euxrakmw7mqpef84r8pq07pdhl56k76ekmv2dklc9vlzpzw8c56skl3r04
+```
+
+```
+./nstrfy.sh listen --key e9279cf0e7f49246861f93f460cc63d7076fe26a3d4d32b3ccfe4959ee696e06
+```
+
+```
+./nstrfy.sh send --to npub1euxrakmw7mqpef84r8pq07pdhl56k76ekmv2dklc9vlzpzw8c56skl3r04 --title "NoTiFiCaTiOns" --message "Hey you should read this" --priority normal
+```
