@@ -55,7 +55,7 @@ apt install jq   # Linux
 ### Generate Keys
 
 ```bash
-./nostr-notify-test.sh generate
+./nstrfy.sh generate
 
 # Output:
 # Private key (hex): d3d3c043fced10f33dd3dcd8eedc4aa96021200fa3a994af057452d94861f14b
@@ -69,14 +69,14 @@ apt install jq   # Linux
 
 ```bash
 # In terminal 1
-./nostr-notify-test.sh listen --key <your_private_key_hex>
+./nstrfy.sh listen --key <your_private_key_hex>
 ```
 
 ### Send a Notification
 
 ```bash
 # In terminal 2
-./nostr-notify-test.sh send \
+./nstrfy.sh send \
   --to npub1... \
   --title "Server Alert" \
   --message "CPU usage is at 95%" \
@@ -91,13 +91,13 @@ apt install jq   # Linux
 #### `generate`
 Generate a new keypair:
 ```bash
-./nostr-notify-test.sh generate
+./nstrfy.sh generate
 ```
 
 #### `send`
 Send a notification:
 ```bash
-./nostr-notify-test.sh send \
+./nstrfy.sh send \
   --to <npub|hex>              # Recipient's public key (required)
   --title <text>               # Notification title (required)
   --message <text>             # Notification message (required)
@@ -111,7 +111,7 @@ Send a notification:
 #### `listen`
 Listen for incoming notifications:
 ```bash
-./nostr-notify-test.sh listen \
+./nstrfy.sh listen \
   --key <hex>                  # Your private key (required)
   --relays <urls>              # Comma-separated relay URLs
 ```
@@ -126,7 +126,7 @@ RECIPIENT="npub1your_npub..."
 # Check CPU usage
 CPU=$(top -bn1 | grep "Cpu(s)" | awk '{print $2}' | cut -d'%' -f1)
 if (( $(echo "$CPU > 90" | bc -l) )); then
-    ./nostr-notify-test.sh send \
+    ./nstrfy.sh send \
       --to "$RECIPIENT" \
       --title "High CPU Usage" \
       --message "CPU usage is at ${CPU}%" \
@@ -141,14 +141,14 @@ fi
 RECIPIENT="npub1your_npub..."
 
 if ./run-backup.sh; then
-    ./nostr-notify-test.sh send \
+    ./nstrfy.sh send \
       --to "$RECIPIENT" \
       --title "Backup Complete" \
       --message "Daily backup completed successfully" \
       --priority low \
       --tags "backup,success"
 else
-    ./nostr-notify-test.sh send \
+    ./nstrfy.sh send \
       --to "$RECIPIENT" \
       --title "Backup Failed" \
       --message "Daily backup failed - check logs" \
@@ -163,7 +163,7 @@ fi
 - name: Notify deployment
   if: always()
   run: |
-    ./nostr-notify-test.sh send \
+    ./nstrfy.sh send \
       --to ${{ secrets.NOSTR_RECIPIENT }} \
       --title "Deployment ${{ job.status }}" \
       --message "Version ${{ github.sha }} deployed to production" \
@@ -174,10 +174,10 @@ fi
 #### Cron Jobs
 ```cron
 # Daily report at 8 AM
-0 8 * * * /usr/local/bin/nostr-notify-test.sh send --to npub1... --title "Daily Report" --message "All systems operational"
+0 8 * * * /usr/local/bin/nstrfy.sh send --to npub1... --title "Daily Report" --message "All systems operational"
 
 # Check website every 5 minutes
-*/5 * * * * curl -s https://mysite.com > /dev/null || /usr/local/bin/nostr-notify-test.sh send --to npub1... --priority urgent --title "Website Down" --message "Site is not responding"
+*/5 * * * * curl -s https://mysite.com > /dev/null || /usr/local/bin/nstrfy.sh send --to npub1... --priority urgent --title "Website Down" --message "Site is not responding"
 ```
 
 ## Default Relays
