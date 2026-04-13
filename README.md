@@ -193,7 +193,7 @@ You can override with the `--relays` flag.
 
 1. **Sender** creates a JSON notification payload with title, message, priority, etc.
 2. **Encryption** happens using NIP-44 (modern, secure encryption standard)
-3. **Publishing** sends the encrypted event (kind 30078) to Nostr relays
+3. **Publishing** sends the event (kind 7741) to Nostr relays
 4. **Receiver** subscribes to events tagged with their public key
 5. **Decryption** happens automatically when notifications arrive
 6. **Display** shows the notification with formatting based on priority
@@ -203,10 +203,11 @@ You can override with the `--relays` flag.
 This tool implements a draft NIP (Nostr Implementation Possibility) for encrypted notifications. See [NIP-DRAFT.md](NIP-DRAFT.md) for the full specification.
 
 **Key Details:**
-- Event Kind: `30078` (parameterized replaceable)
-- Encryption: NIP-44 (NIP-04 is deprecated/broken in nak)
-- Tags: `p` (recipient pubkey), `d` (unique ID)
-- Content: Encrypted JSON with version, title, message, priority, etc.
+- Event Kind: `7741` (regular event, stored by relays)
+- Encryption: NIP-44 (when sending to a specific recipient), or plain JSON (public)
+- Expiration: NIP-40 (default 1 hour)
+- Tags: `p` (recipient pubkey, for encrypted), `d` (unique ID), `expiration` (NIP-40)
+- Content: Encrypted or plain JSON with version, title, message, priority, topic, etc.
 
 ## Comparison to ntfy
 

@@ -192,7 +192,7 @@ async function startListening() {
     state.startTime = Date.now();
     
     const filter = {
-        kinds: [30078],
+        kinds: [7741],
         '#p': [state.publicKey],
         since: Math.floor(Date.now() / 1000)
     };

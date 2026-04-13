@@ -10,11 +10,11 @@ This NIP defines a standard for sending encrypted, push-style notifications over
 
 ## Abstract
 
-Applications often need to send notifications to users (alerts, reminders, status updates) without requiring interactive messages. This NIP defines a standardized event kind and payload format for encrypted notifications that can be displayed by supporting clients.
+Applications often need to send notifications to users (alerts, reminders, status updates) without requiring interactive messages. This NIP defines a standardized event kind and payload format for encrypted or public notifications that can be displayed by supporting clients.
 
 ## Motivation
 
-While NIP-04 encrypted direct messages work for conversations, they lack:
+While NIP-17 encrypted direct messages work for conversations, they lack:
 - Standardized metadata (priority, topic, actions)
 - Clear distinction between messages and notifications
 - Support for notification-specific features (urgency, topics, actions)
@@ -23,25 +23,35 @@ This NIP provides a dedicated notification format compatible with modern notific
 
 ## Event Structure
 
-Notifications use **parameterized replaceable events** (kind `30078`) with NIP-44 encryption.
+Notifications use **kind `7741`** regular events with optional NIP-44 encryption and NIP-40 expiration.
 
 ### Event Kind
 
-- `30078`: Encrypted Notification
+- `7741`: Notification
+
+### Modes
+
+- **Encrypted (inbox)**: Content is NIP-44 encrypted to a specific recipient. Event includes `#p` tag with recipient's pubkey.
+- **Public**: Content is plain JSON. No `#p` tag. Anyone subscribed to the topic can read it.
 
 ### Tags
 
 Required tags:
-- `p`: Recipient's public key (hex)
 - `d`: Unique identifier (recommended: timestamp + random)
 
-Optional tags:
-- `relay`: Suggested relay for recipient
-- `expiration`: Unix timestamp when notification expires (NIP-40)
+Conditional tags:
+- `p`: Recipient's public key (hex) — required for encrypted notifications, omitted for public
+
+Recommended tags:
+- `expiration`: Unix timestamp when notification expires (NIP-40). Default: 1 hour from creation.
 
 ### Content
 
-The `content` field contains a NIP-44 encrypted JSON payload with the following structure:
+For **encrypted** notifications, the `content` field contains a NIP-44 encrypted JSON payload.
+
+For **public** notifications, the `content` field contains plain JSON.
+
+Payload structure:
 
 ```json
 {
@@ -81,7 +91,7 @@ The `content` field contains a NIP-44 encrypted JSON payload with the following 
   - `"low"`: Low priority, can be deferred
   - `"min"`: Minimal priority, silent notifications
 - `timestamp` (number): Unix timestamp of notification creation
-- `topic` (string): Category or channel identifier
+- `topic` (string): Category or channel identifier. Topic matching is done client-side after decryption — relay-level topic filtering is not possible.
 - `tags` (array): Array of string tags for filtering/categorization
 - `click` (string): URL to open when notification is clicked
 - `icon` (string): URL to notification icon image
@@ -107,45 +117,78 @@ Action objects support interactive notifications:
 
 ## Implementation
 
-### Sending Notifications
+### Sending Encrypted Notifications
 
 1. Create notification payload as JSON
 2. Encrypt payload using NIP-44 with recipient's public key
-3. Create kind `30078` event with:
+3. Create kind `7741` event with:
    - Encrypted payload as `content`
    - Recipient pubkey in `p` tag
    - Unique identifier in `d` tag
+   - Expiration timestamp in `expiration` tag (NIP-40)
 4. Sign and publish event to relays
+
+### Sending Public Notifications
+
+1. Create notification payload as JSON
+2. Create kind `7741` event with:
+   - Plain JSON payload as `content`
+   - Unique identifier in `d` tag
+   - Expiration timestamp in `expiration` tag (NIP-40)
+   - No `p` tag
+3. Sign and publish event to relays
 
 ### Receiving Notifications
 
-1. Subscribe to kind `30078` events with filter: `{"kinds": [30078], "#p": [<user_pubkey>]}`
-2. Decrypt `content` using NIP-44
-3. Parse JSON payload
-4. Display notification according to client capabilities
-5. Handle priority levels appropriately
-6. Support click actions and interactive buttons if capable
+1. Subscribe to kind `7741` events with filters:
+   - Inbox: `{"kinds": [7741], "#p": [<user_pubkey>]}`
+   - Public: `{"kinds": [7741]}` (optionally filtered by `authors`)
+2. For events with `#p` tag: decrypt `content` using NIP-44
+3. For events without `#p` tag: parse `content` as plain JSON
+4. Match `topic` field against subscribed topics (client-side)
+5. Display notification according to client capabilities
+6. Check sender against per-topic allowlists (spam protection)
 
 ## Examples
 
-### Basic Notification
+### Encrypted Notification
 
 ```json
 {
-  "kind": 30078,
+  "kind": 7741,
   "pubkey": "sender_pubkey_hex",
   "created_at": 1234567890,
   "tags": [
     ["p", "recipient_pubkey_hex"],
-    ["d", "1234567890-abc123"]
+    ["d", "1234567890-abc123"],
+    ["expiration", "1234571490"]
   ],
-  "content": "encrypted_payload",
+  "content": "nip44_encrypted_payload",
   "id": "event_id",
   "sig": "signature"
 }
 ```
 
-Decrypted payload:
+### Public Notification
+
+```json
+{
+  "kind": 7741,
+  "pubkey": "sender_pubkey_hex",
+  "created_at": 1234567890,
+  "tags": [
+    ["d", "1234567890-abc123"],
+    ["expiration", "1234571490"]
+  ],
+  "content": "{\"version\":\"1.0\",\"title\":\"Deploy Complete\",\"message\":\"v2.0 is live\",\"priority\":\"high\",\"topic\":\"deploys\",\"timestamp\":1234567890}",
+  "id": "event_id",
+  "sig": "signature"
+}
+```
+
+### Decrypted Payload Examples
+
+Basic:
 ```json
 {
   "version": "1.0",
@@ -156,8 +199,7 @@ Decrypted payload:
 }
 ```
 
-### Urgent Notification with Topic
-
+Urgent with topic and actions:
 ```json
 {
   "version": "1.0",
@@ -167,44 +209,14 @@ Decrypted payload:
   "topic": "infrastructure",
   "tags": ["production", "api", "downtime"],
   "timestamp": 1234567890,
-  "click": "https://status.example.com"
-}
-```
-
-### Notification with Actions
-
-```json
-{
-  "version": "1.0",
-  "title": "Deployment Ready",
-  "message": "Version 2.0.1 is ready to deploy",
-  "priority": "high",
-  "topic": "deployments",
-  "timestamp": 1234567890,
+  "click": "https://status.example.com",
   "actions": [
     {
-      "label": "Deploy Now",
-      "url": "https://deploy.example.com/v2.0.1",
-      "method": "http"
-    },
-    {
-      "label": "View Changes",
-      "url": "https://github.com/example/repo/releases/v2.0.1",
+      "label": "View Status",
+      "url": "https://status.example.com",
       "method": "view"
     }
   ]
-}
-```
-
-### Silent Notification (Minimal Priority)
-
-```json
-{
-  "version": "1.0",
-  "message": "Daily backup completed",
-  "priority": "min",
-  "topic": "backups",
-  "timestamp": 1234567890
 }
 ```
 
@@ -222,27 +234,36 @@ Clients SHOULD implement priority levels as follows:
 
 ### Topics and Filtering
 
-Clients MAY implement:
-- Topic-based filtering (show only specific topics)
-- Per-topic notification settings
-- Topic muting/blocking
+- Topic is a client-side field in the payload, not a nostr tag
+- Nostr's namespace is global — anyone can post with any topic value
+- Per-topic sender allowlists are the primary spam protection
+- Clients MAY implement topic-based muting, priority overrides, and auto-delete
 
 ### Deduplication
 
-Clients SHOULD deduplicate notifications by:
-- Event ID (primary deduplication)
-- `d` tag value (secondary, for replacements)
+Clients SHOULD deduplicate notifications by event ID.
 
 ### Expiration
 
-Clients SHOULD respect NIP-40 expiration tags and not display expired notifications.
+- Senders SHOULD include NIP-40 `expiration` tags (recommended: 1 hour)
+- Relays supporting NIP-40 will auto-delete expired events
+- Clients SHOULD NOT display expired notifications
+- The `since` filter parameter can prevent historical replay on reconnect
+
+### External Signer Support
+
+Clients supporting NIP-55 external signers (e.g., Amber on Android):
+- SHOULD use the ContentProvider channel for silent background decryption
+- SHOULD queue encrypted events for foreground decryption when background access is unavailable
+- SHOULD display a generic notification ("New encrypted notification") for queued events
 
 ### Privacy Considerations
 
-- Notifications are end-to-end encrypted via NIP-44
-- Relays cannot read notification content
+- Encrypted notifications are end-to-end encrypted via NIP-44
+- Relays cannot read encrypted notification content
 - Metadata (tags, event kind) is visible to relays
-- Recipients' public keys are visible in `p` tags
+- Recipients' public keys are visible in `p` tags for encrypted notifications
+- Public notifications are readable by anyone
 - Senders MAY use ephemeral keys for additional anonymity
 
 ## Security Considerations
@@ -250,49 +271,38 @@ Clients SHOULD respect NIP-40 expiration tags and not display expired notificati
 ### Spam Prevention
 
 Implementations SHOULD provide:
-- Allowlist/blocklist for sender public keys
-- Topic-based filtering
+- Per-topic sender allowlists (npub whitelist)
+- Automatic discarding of events from unknown senders (when whitelist is enabled)
 - Rate limiting per sender
-- Automatic blocking of abusive senders
-
-### Malicious Content
-
-Clients MUST:
-- Sanitize notification text before display
-- Validate URLs before opening
-- Warn users about external HTTP actions
-- Prevent code execution from notification content
 
 ### Key Management
 
-- Senders MAY use ephemeral keys (generated per-notification)
-- Senders MAY use persistent keys (for authenticated notifications)
-- Recipients MUST protect private keys used for decryption
+- Senders MAY use ephemeral keys (generated per-notification) for anonymous sending
+- Senders MAY use persistent keys for authenticated notifications
+- Recipients using external signers (NIP-55) never expose private keys to the notification client
 
 ## Implementation Status
 
 This NIP is currently implemented by:
-- `nstrfy.sh` - Bash CLI tool using nak
-- `nostr-notify` - Go CLI tool
-- `nostr-notify-web` - Web client (JavaScript)
-- `nostr-notify-android` - Mobile app (Kotlin)
+- `nstrfy.sh` - Bash CLI tool using nak (https://github.com/vcavallo/nstrfy.sh)
+- `nstrfy-android` - Android app with Amber signer support (https://github.com/vcavallo/nstrfy-android)
 
 ## Rationale
 
-### Why Kind 30078?
+### Why Kind 7741?
 
-- Uses parameterized replaceable events for potential future updates
-- In the range allocated for custom application events
-- Distinct from existing message/chat event kinds
+- Regular event kind (stored by relays for offline delivery)
+- Not in any reserved/allocated NIP range
+- Combined with NIP-40 expiration to prevent unbounded storage
+- Distinct from kind 30078 (application-specific data) which is a crowded namespace used by many apps
 
 ### Why NIP-44 Instead of NIP-04?
 
 - NIP-44 is more secure and properly specified
-- NIP-04 has known implementation issues (broken in nak 0.16.1)
-- Better forward secrecy and security properties
+- Better security properties
 - NIP-44 is the recommended standard for new applications
 
-### Why Not Use Kind 4 (Direct Messages)?
+### Why Not Use Kind 4 or Kind 14 (Direct Messages)?
 
 - Conceptual clarity: notifications are not conversational messages
 - Allows separate filtering and handling by clients
@@ -302,30 +312,28 @@ This NIP is currently implemented by:
 ## Future Extensions
 
 Possible future additions:
-- Multi-recipient notifications (encrypt separately for each)
-- Delivery receipts (NIP-65 style acknowledgments)
-- Read receipts
+- Group notifications via NIP-17 pattern (per-recipient encryption)
+- Delivery receipts
 - Notification grouping/threading
 - Rich media attachments
-- Scheduled/delayed notifications
-- Geographic targeting
 
 ## Backwards Compatibility
 
-Clients not implementing this NIP will ignore kind `30078` events. No breaking changes to existing NIPs.
+Clients not implementing this NIP will ignore kind `7741` events. No breaking changes to existing NIPs.
 
 ## References
 
 - [NIP-01: Basic Protocol](https://github.com/nostr-protocol/nips/blob/master/01.md)
 - [NIP-44: Encrypted Payloads (Versioned)](https://github.com/nostr-protocol/nips/blob/master/44.md)
-- [NIP-33: Parameterized Replaceable Events](https://github.com/nostr-protocol/nips/blob/master/33.md)
 - [NIP-40: Expiration Timestamp](https://github.com/nostr-protocol/nips/blob/master/40.md)
+- [NIP-55: Android Signer Application](https://github.com/nostr-protocol/nips/blob/master/55.md)
+- [NIP-65: Relay List Metadata](https://github.com/nostr-protocol/nips/blob/master/65.md)
 
 ## License
 
-Public Domain
+WTFPL - Do What the Fuck You Want to Public License
 
 ## Changelog
 
-- 2024-11-25: Initial draft
-- 2024-11-25: Updated to use NIP-44 instead of NIP-04
+- 2024-11-25: Initial draft (kind 30078, NIP-44 encryption)
+- 2025-04-13: v2.0 — Changed to kind 7741, added public (unencrypted) mode, NIP-40 expiration, NIP-55 signer support, per-topic allowlists

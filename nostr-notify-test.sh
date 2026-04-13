@@ -6,7 +6,7 @@
 set -e
 
 VERSION="1.0"
-EVENT_KIND=30078
+EVENT_KIND=7741
 DEFAULT_RELAYS="wss://relay.damus.io,wss://nos.lol,wss://relay.nostr.band"
 
 # Colors for output

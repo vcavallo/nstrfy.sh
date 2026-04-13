@@ -1,13 +1,14 @@
 #!/bin/bash
-# nostr-notify-test - Test encrypted notifications using nak
+# nstrfy - Send push notifications over Nostr
 # Requires: nak (https://github.com/fiatjaf/nak)
-# Usage: ./nostr-notify-test.sh [command] [options]
+# Usage: ./nstrfy.sh [command] [options]
 
 set -e
 
-VERSION="1.0"
-EVENT_KIND=30078
+VERSION="2.0"
+EVENT_KIND=7741
 DEFAULT_RELAYS="wss://relay.damus.io,wss://nos.lol,wss://relay.nostr.band"
+DEFAULT_EXPIRATION=3600  # 1 hour
 
 # Colors for output
 RED='\033[0;31m'
@@ -101,7 +102,14 @@ EOF
     echo -e "$payload"
 }
 
-# Send notification
+# Generate a unique d tag without openssl dependency
+generate_d_tag() {
+    local timestamp=$(date +%s)
+    local random=$(head -c4 /dev/urandom | od -An -tx1 | tr -d ' \n')
+    echo "${timestamp}-${random}"
+}
+
+# Send notification (encrypted to recipient, or public)
 send_notification() {
     local recipient="$1"
     local title="$2"
@@ -111,18 +119,15 @@ send_notification() {
     local tags="${6:-}"
     local privkey="${7:-}"
     local relays="${8:-$DEFAULT_RELAYS}"
-
-    # Convert npub to hex if needed
-    if [[ "$recipient" == npub* ]]; then
-        info "Converting npub to hex..."
-        recipient=$(nak decode "$recipient" -p)
-    fi
+    local expiration="${9:-$DEFAULT_EXPIRATION}"
 
     # Generate ephemeral key if not provided
     if [ -z "$privkey" ]; then
-        info "Generating ephemeral key for anonymous sending..."
+        info "Generating ephemeral key for sending..."
         privkey=$(nak key generate)
     fi
+
+    local sender_pubkey=$(nak key public "$privkey")
 
     # Create payload
     info "Creating notification payload..."
@@ -133,45 +138,78 @@ send_notification() {
     echo "$payload" | jq '.' 2>/dev/null || echo "$payload"
     echo ""
 
-    # Encrypt payload using NIP-44
-    info "Encrypting payload with NIP-44..."
-    local encrypted=$(nak encrypt --sec "$privkey" -p "$recipient" "$payload")
+    # Generate unique d tag and expiration
+    local d_tag=$(generate_d_tag)
+    local expiration_ts=$(($(date +%s) + expiration))
 
-    if [ -z "$encrypted" ]; then
-        error "Encryption failed"
-        exit 1
-    fi
+    if [ -n "$recipient" ]; then
+        # Encrypted mode: NIP-44 encrypt + #p tag
+        # Convert npub to hex if needed
+        if [[ "$recipient" == npub* ]]; then
+            info "Converting npub to hex..."
+            recipient=$(nak decode "$recipient" -p)
+        fi
 
-    success "Payload encrypted"
+        info "Encrypting payload with NIP-44..."
+        local encrypted=$(nak encrypt --sec "$privkey" -p "$recipient" "$payload")
 
-    # Create unique d tag
-    local d_tag="$(date +%s)-$(openssl rand -hex 4)"
+        if [ -z "$encrypted" ]; then
+            error "Encryption failed"
+            exit 1
+        fi
 
-    # Create and publish event
-    info "Publishing event to relays..."
+        success "Payload encrypted"
+        info "Publishing event to relays..."
 
-    # Build event using nak event
-    local event_result=$(nak event \
-        --kind $EVENT_KIND \
-        --content "$encrypted" \
-        -t "p=$recipient" \
-        -t "d=$d_tag" \
-        --sec "$privkey" \
-        $(echo "$relays" | tr ',' ' ')
-    )
+        nak event \
+            --kind $EVENT_KIND \
+            --content "$encrypted" \
+            -t "p=$recipient" \
+            -t "d=$d_tag" \
+            -t "expiration=$expiration_ts" \
+            --sec "$privkey" \
+            $(echo "$relays" | tr ',' ' ')
 
-    if [ $? -eq 0 ]; then
-        success "Notification sent!"
-        echo ""
-        echo "Event published to: $relays"
-        echo "Recipient: $(nak encode npub $recipient)"
-        echo "Priority: $priority"
-        [ -n "$topic" ] && echo "Topic: $topic"
-        [ -n "$tags" ] && echo "Tags: $tags"
+        if [ $? -eq 0 ]; then
+            echo ""
+            success "Encrypted notification sent!"
+            echo "Recipient: $(nak encode npub $recipient)"
+            echo "Relays: $relays"
+            echo "Priority: $priority"
+            [ -n "$topic" ] && echo "Topic: $topic"
+            echo "Expires: $(date -d @$expiration_ts 2>/dev/null || date -r $expiration_ts 2>/dev/null || echo "in ${expiration}s")"
+        else
+            error "Failed to send notification"
+            exit 1
+        fi
     else
-        error "Failed to send notification"
-        echo "$event_result"
-        exit 1
+        # Public mode: plain JSON content, no #p tag, no encryption
+        info "Publishing public event to relays..."
+
+        nak event \
+            --kind $EVENT_KIND \
+            --content "$payload" \
+            -t "d=$d_tag" \
+            -t "expiration=$expiration_ts" \
+            --sec "$privkey" \
+            $(echo "$relays" | tr ',' ' ')
+
+        if [ $? -eq 0 ]; then
+            echo ""
+            success "Public notification sent!"
+            echo "Sender: $(nak encode npub $sender_pubkey)"
+            echo "Relays: $relays"
+            echo "Priority: $priority"
+            [ -n "$topic" ] && echo "Topic: $topic"
+            echo "Expires: $(date -d @$expiration_ts 2>/dev/null || date -r $expiration_ts 2>/dev/null || echo "in ${expiration}s")"
+            echo ""
+            warn "This is a public notification — anyone subscribed to topic '$topic' (with whitelist disabled) can see it."
+            echo "Sender pubkey: $sender_pubkey"
+            echo "(Add this pubkey to the topic's allowlist if whitelist is enabled)"
+        else
+            error "Failed to send notification"
+            exit 1
+        fi
     fi
 }
 
@@ -246,7 +284,7 @@ listen() {
 # Show help
 show_help() {
     cat <<EOF
-${BLUE}nostr-notify-test${NC} - Test encrypted notifications over Nostr (NIP-XX)
+${BLUE}nstrfy${NC} - Send push notifications over Nostr
 Version: $VERSION
 
 ${YELLOW}USAGE:${NC}
@@ -256,14 +294,15 @@ ${YELLOW}COMMANDS:${NC}
   ${GREEN}generate${NC}                  Generate a new private key
 
   ${GREEN}send${NC} [options]            Send a notification
-    --to <npub/hex>           Recipient's public key (required)
+    --to <npub/hex>           Recipient's public key (omit for public notification)
     --title <text>            Notification title (required)
     --message <text>          Notification message (required)
     --priority <level>        Priority: urgent|high|default|low|min (default: default)
-    --topic <text>            Notification topic/category
+    --topic <text>            Notification topic/channel
     --tags <tag1,tag2>        Comma-separated tags
     --key <hex>               Sender's private key (generates ephemeral if omitted)
     --relays <urls>           Comma-separated relay URLs (default: $DEFAULT_RELAYS)
+    --expiration <seconds>    Event expiration in seconds (default: $DEFAULT_EXPIRATION)
 
   ${GREEN}listen${NC} [options]          Listen for notifications
     --key <hex>               Your private key (required)
@@ -275,13 +314,13 @@ ${YELLOW}EXAMPLES:${NC}
   # Generate a new key
   $0 generate
 
-  # Send a basic notification
+  # Send a public notification (no encryption, anyone on the topic can see it)
   $0 send \\
-    --to npub1abc123... \\
-    --title "Test" \\
-    --message "Hello World"
+    --title "Deploy complete" \\
+    --message "v2.4.1 is live" \\
+    --topic deploys
 
-  # Send an urgent notification with topic
+  # Send an encrypted notification to a specific npub
   $0 send \\
     --to npub1abc123... \\
     --title "Server Down" \\
@@ -300,18 +339,21 @@ ${YELLOW}EXAMPLES:${NC}
   # Listen for notifications
   $0 listen --key <your_private_key_hex>
 
+${YELLOW}EVENT FORMAT:${NC}
+  Kind: $EVENT_KIND (regular event, stored by relays)
+  Encryption: NIP-44 (when --to is specified)
+  Expiration: NIP-40 (default ${DEFAULT_EXPIRATION}s / $(( DEFAULT_EXPIRATION / 60 )) minutes)
+  Payload: JSON with version, title, message, priority, timestamp, topic, tags
+
+${YELLOW}COMPANION APP:${NC}
+  nstrfy Android: https://github.com/vcavallo/nstrfy-android
+
 ${YELLOW}REQUIREMENTS:${NC}
   - nak (https://github.com/fiatjaf/nak)
-  - jq (https://stedolan.github.io/jq/)
-
-${YELLOW}INSTALL NAK:${NC}
-  go install github.com/fiatjaf/nak@latest
-
-${YELLOW}NIP SPECIFICATION:${NC}
-  See NIP-DRAFT-NOTIFICATIONS.md for full protocol specification
+  - jq (https://stedolan.github.io/jq/) (for listen command)
 
 ${YELLOW}LICENSE:${NC}
-  MIT License
+  WTFPL - Do What the Fuck You Want to Public License
 EOF
 }
 
@@ -337,6 +379,7 @@ case "$COMMAND" in
         TAGS=""
         KEY=""
         RELAYS="$DEFAULT_RELAYS"
+        EXPIRATION="$DEFAULT_EXPIRATION"
 
         while [[ $# -gt 0 ]]; do
             case $1 in
@@ -372,6 +415,10 @@ case "$COMMAND" in
                     RELAYS="$2"
                     shift 2
                     ;;
+                --expiration)
+                    EXPIRATION="$2"
+                    shift 2
+                    ;;
                 *)
                     error "Unknown option: $1"
                     echo "Run '$0 help' for usage information"
@@ -381,15 +428,16 @@ case "$COMMAND" in
         done
 
         # Validate required arguments
-        if [ -z "$TO" ] || [ -z "$TITLE" ] || [ -z "$MESSAGE" ]; then
+        if [ -z "$TITLE" ] || [ -z "$MESSAGE" ]; then
             error "Missing required arguments"
             echo ""
-            echo "Required: --to, --title, --message"
+            echo "Required: --title, --message"
+            echo "Optional: --to (omit for public notification)"
             echo "Run '$0 help' for usage information"
             exit 1
         fi
 
-        send_notification "$TO" "$TITLE" "$MESSAGE" "$PRIORITY" "$TOPIC" "$TAGS" "$KEY" "$RELAYS"
+        send_notification "$TO" "$TITLE" "$MESSAGE" "$PRIORITY" "$TOPIC" "$TAGS" "$KEY" "$RELAYS" "$EXPIRATION"
         ;;
 
     listen)
