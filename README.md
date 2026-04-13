@@ -1,18 +1,18 @@
 # nstrfy.sh - Nostr Notifications
 
-**VIBECODED FOR NOW. manual intervention forthcoming**.
+Send and receive optionally-encrypted notifications over Nostr using simple bash scripts powered by `nak`.
 
-Send and receive encrypted notifications over Nostr using simple bash scripts powered by `nak`.
+Best paired with [nstrfy android](https://github.com/vcavallo/nstrfy-android).
 
 ## Overview
 
-`nstrfy.sh` is a lightweight, bash-based notification system that uses the Nostr protocol for decentralized, end-to-end encrypted notifications. It's perfect for server monitoring, CI/CD alerts, backup notifications, and any scenario where you need reliable push notifications without centralized infrastructure.
+`nstrfy.sh` is a lightweight, bash-based notification system that uses the Nostr protocol for decentralized, end-to-end encrypted notifications.
 
 ## Features
 
-- **End-to-end encrypted** using NIP-44
-- **Decentralized** - uses public Nostr relays
-- **Zero dependencies** except `nak` and `jq`
+- **End-to-end encrypted** using NIP-44 (optional. public is cool, too)
+- **Decentralized** - uses Nostr relays
+- **Few dependencies:** `nak` and `jq`
 - **Simple CLI** - works like `curl` or `ntfy`
 - **Priority levels** - urgent, high, default, low, min
 - **Topics and tags** - organize your notifications
@@ -21,24 +21,8 @@ Send and receive encrypted notifications over Nostr using simple bash scripts po
 ## Quick Start
 
 ```unset
-./nstrfy.sh generate
-✓ nak found: /opt/homebrew/bin/nak
-ℹ Generating new private key...
-
-✓ Key generated!
-Private key (hex): e9279cf0e7f49246861f93f460cc63d7076fe26a3d4d32b3ccfe4959ee696e06
-Public key (hex):  cf0c3edb6ef6c01ca4f519c207f82dbfe9ab7b59b6d8a6dbf82b3e2089c7c535
-Public key (npub): npub1euxrakmw7mqpef84r8pq07pdhl56k76ekmv2dklc9vlzpzw8c56skl3r04
+./nstrfy.sh send --to npub1euxrakmw7mqpef84r8pq07pdhl56k76ekmv2dklc9vlzpzw8c56skl3r04 --topic "my-topic" --title "NoTiFiCaTiOns" --message "Hey you should read this" --priority normal
 ```
-
-```
-./nstrfy.sh listen --key e9279cf0e7f49246861f93f460cc63d7076fe26a3d4d32b3ccfe4959ee696e06
-```
-
-```
-./nstrfy.sh send --to npub1euxrakmw7mqpef84r8pq07pdhl56k76ekmv2dklc9vlzpzw8c56skl3r04 --title "NoTiFiCaTiOns" --message "Hey you should read this" --priority normal
-```
-
 
 ### Prerequisites
 
@@ -65,17 +49,9 @@ apt install jq   # Linux
 # Save your private key securely!
 ```
 
-### Listen for Notifications
-
-```bash
-# In terminal 1
-./nstrfy.sh listen --key <your_private_key_hex>
-```
-
 ### Send a Notification
 
 ```bash
-# In terminal 2
 ./nstrfy.sh send \
   --to npub1... \
   --title "Server Alert" \
@@ -89,13 +65,17 @@ apt install jq   # Linux
 ### Commands
 
 #### `generate`
+
 Generate a new keypair:
+
 ```bash
 ./nstrfy.sh generate
 ```
 
 #### `send`
+
 Send a notification:
+
 ```bash
 ./nstrfy.sh send \
   --to <npub|hex>              # Recipient's public key (required)
@@ -109,7 +89,9 @@ Send a notification:
 ```
 
 #### `listen`
+
 Listen for incoming notifications:
+
 ```bash
 ./nstrfy.sh listen \
   --key <hex>                  # Your private key (required)
@@ -119,6 +101,7 @@ Listen for incoming notifications:
 ### Examples
 
 #### Server Monitoring
+
 ```bash
 #!/bin/bash
 RECIPIENT="npub1your_npub..."
@@ -136,6 +119,7 @@ fi
 ```
 
 #### Backup Notifications
+
 ```bash
 #!/bin/bash
 RECIPIENT="npub1your_npub..."
@@ -158,6 +142,7 @@ fi
 ```
 
 #### CI/CD Integration
+
 ```yaml
 # GitHub Actions
 - name: Notify deployment
@@ -172,6 +157,9 @@ fi
 ```
 
 #### Cron Jobs
+
+(Super nice to use with pi.dev or OpenClaw...)
+
 ```cron
 # Daily report at 8 AM
 0 8 * * * /usr/local/bin/nstrfy.sh send --to npub1... --title "Daily Report" --message "All systems operational"
@@ -183,6 +171,7 @@ fi
 ## Default Relays
 
 By default, the script uses these public Nostr relays:
+
 - `wss://relay.damus.io`
 - `wss://nos.lol`
 - `wss://relay.nostr.band`
@@ -192,9 +181,9 @@ You can override with the `--relays` flag.
 ## How It Works
 
 1. **Sender** creates a JSON notification payload with title, message, priority, etc.
-2. **Encryption** happens using NIP-44 (modern, secure encryption standard)
+2. **Encryption** happens using NIP-44
 3. **Publishing** sends the event (kind 7741) to Nostr relays
-4. **Receiver** subscribes to events tagged with their public key
+4. **Receiver** subscribes to events
 5. **Decryption** happens automatically when notifications arrive
 6. **Display** shows the notification with formatting based on priority
 
@@ -203,6 +192,7 @@ You can override with the `--relays` flag.
 This tool implements a draft NIP (Nostr Implementation Possibility) for encrypted notifications. See [NIP-DRAFT.md](NIP-DRAFT.md) for the full specification.
 
 **Key Details:**
+
 - Event Kind: `7741` (regular event, stored by relays)
 - Encryption: NIP-44 (when sending to a specific recipient), or plain JSON (public)
 - Expiration: NIP-40 (default 1 hour)
@@ -214,20 +204,16 @@ This tool implements a draft NIP (Nostr Implementation Possibility) for encrypte
 | Feature | ntfy | nstrfy.sh |
 |---------|------|-----------|
 | Architecture | Centralized | Decentralized |
-| Encryption | Optional | Always E2E |
-| Infrastructure | Self-host required | Free relays |
+| Infrastructure | Self-host required | "Free"" relays |
 | Censorship | Can be blocked | Resistant |
 | Privacy | Server sees metadata | Fully encrypted |
-| Cost | Server/hosting costs | $0 |
+| Cost | Server/hosting costs | $0 w/ public/free relays |
 | Installation | Server setup | Single script |
 
 ## Security
 
-- **End-to-end encryption**: All notifications are encrypted with NIP-44
-- **No metadata leakage**: Message content is never visible to relays
 - **Ephemeral keys**: Optional anonymous sending with auto-generated keys
 - **Persistent keys**: Optional authenticated notifications with reusable keys
-- **Key storage**: Keep your private keys secure (`chmod 600`)
 
 ## Receivers
 
@@ -235,21 +221,13 @@ You can receive notifications in multiple ways:
 
 1. **Bash script** (this project) - Terminal-based listener
 2. **Web app** - Browser-based receiver with desktop notifications
-3. **Android app** - Native mobile app with background service
+3. **Android app** - <https://github.com/vcavallo/nstrfy-android> - Native mobile app with background service
 4. **Custom client** - Build your own using the NIP specification
 
 ## Troubleshooting
 
-### Notifications not arriving
-- Check your private key is correct
-- Verify relays are accessible
-- Ensure listener is running
-- Try with `-v` flag for verbose output
-
-### NIP-04 vs NIP-44
-This tool uses NIP-44 because NIP-04 is broken in nak 0.16.1. The web and Android clients have been updated to support both.
-
 ### Browser notifications not working (web app)
+
 - Grant notification permission when prompted
 - Check browser settings allow notifications for localhost
 - Some browsers block notifications on HTTP (use HTTPS or localhost)
@@ -257,6 +235,7 @@ This tool uses NIP-44 because NIP-04 is broken in nak 0.16.1. The web and Androi
 ## Contributing
 
 Contributions welcome! This is a simple bash script that can be extended with:
+
 - Action buttons (HTTP callbacks)
 - Image/icon support
 - Delivery receipts
@@ -274,15 +253,9 @@ MIT
 - [Nostr Protocol](https://github.com/nostr-protocol/nostr) - Main protocol repo
 - [ntfy](https://ntfy.sh/) - Centralized notification service (inspiration)
 
-## Credits
-
-Built with:
-- [nak](https://github.com/fiatjaf/nak) by @fiatjaf - Nostr CLI Swiss Army knife
-- [Nostr Protocol](https://github.com/nostr-protocol/nostr) - Decentralized social protocol
-- Inspired by [ntfy](https://ntfy.sh/) - Simple notification service
-
 ## Support
 
-- 🐛 Issues: GitHub Issues
-- 💬 Questions: GitHub Discussions
-- 📖 Docs: This README and [NIP-DRAFT.md](NIP-DRAFT.md)
+- Author: npub19ma2w9dmk3kat0nt0k5dwuqzvmg3va9ezwup0zkakhpwv0vcwvcsg8axkl
+- Issues: GitHub Issues
+- Questions: GitHub Discussions
+- Docs: This README and [NIP-DRAFT.md](NIP-DRAFT.md)
