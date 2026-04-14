@@ -2,22 +2,32 @@
 
 Browser client for the [nstrfy](../) nostr-based push-notification system.
 
-**Current state:** Phase 1 — Write mode only. Fill out a form, the page posts to a
-signing function (`/api/send`), the function signs a kind 7741 event with a
-shared demo identity and publishes it to relays.
+**Live at <https://nstrfy.sh>.**
 
-Listen mode, NIP-07 login, per-topic whitelists, and the user-own-key signing
-path are coming. See `../WEB_CLIENT_PLAN.md`.
+## Features
+
+- **Send tab** — compose and publish kind 7741 notifications. Public broadcast,
+  or NIP-44 encrypted to a specific npub.
+- **Listen tab** — subscribe to incoming notifications, with browser/desktop
+  alerts and a live unread indicator on the tab.
+- **NIP-07 signer** — connect a browser extension (Alby, nos2x, etc.) to sign
+  events with your own key. Without a signer, the `/api/send` function signs
+  with a shared demo identity.
+- **PWA** — installable, with a service worker registered.
+
+Per-topic whitelists are still to come **in this web client** — they already
+work in the [Android app](https://github.com/vcavallo/nstrfy-android). See
+`../WEB_CLIENT_PLAN.md`.
 
 ## Layout
 
 ```
 nostr-notify-web/
-├── index.html          # Write form
-├── app.js              # Form handler (vanilla JS, no build step)
+├── index.html          # Send + Listen tabs, signer bar
+├── app.js              # Tab UI, signer integration, send/listen (vanilla JS, no build step)
 ├── styles.css
-├── manifest.json       # PWA manifest (unused in Phase 1)
-├── sw.js               # Service worker (not registered in Phase 1)
+├── manifest.json       # PWA manifest
+├── sw.js               # Service worker
 ├── .well-known/
 │   └── nostr.json      # NIP-05 mapping for the demo identity
 ├── api/

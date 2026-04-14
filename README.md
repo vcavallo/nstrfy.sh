@@ -2,11 +2,13 @@
 
 Send and receive optionally-encrypted notifications over Nostr using simple bash scripts powered by `nak`.
 
+**Live web client:** <https://nstrfy.sh>
+
 Best paired with [nstrfy android](https://github.com/vcavallo/nstrfy-android).
 
 ## Overview
 
-`nstrfy.sh` is a lightweight, bash-based notification system that uses the Nostr protocol for decentralized, end-to-end encrypted notifications.
+`nstrfy.sh` is a lightweight, bash-based notification system that uses the Nostr protocol for decentralized, end-to-end encrypted notifications. A companion web client is hosted at [nstrfy.sh](https://nstrfy.sh) for sending and listening directly from the browser.
 
 ## Features
 
@@ -215,14 +217,23 @@ This tool implements a draft NIP (Nostr Implementation Possibility) for encrypte
 - **Ephemeral keys**: Optional anonymous sending with auto-generated keys
 - **Persistent keys**: Optional authenticated notifications with reusable keys
 
+## Web Client
+
+A hosted web client is live at <https://nstrfy.sh> (source in [`nostr-notify-web/`](nostr-notify-web/)). It includes:
+
+- **Send tab** — compose and publish notifications (public or NIP-44 encrypted to a specific npub)
+- **Listen tab** — subscribe to incoming notifications with browser/desktop alerts and a live unread indicator
+- **NIP-07 signer support** — connect a browser extension (Alby, nos2x, etc.) to sign events with your own key, or let the app generate an ephemeral key
+- **PWA** — installable with a service worker
+
 ## Receivers
 
 You can receive notifications in multiple ways:
 
-1. **Bash script** (this project) - Terminal-based listener
-2. **Web app** - Browser-based receiver with desktop notifications
-3. **Android app** - <https://github.com/vcavallo/nstrfy-android> - Native mobile app with background service
-4. **Custom client** - Build your own using the NIP specification
+1. **Bash script** (this project) — terminal-based listener
+2. **Web app** — <https://nstrfy.sh> — browser-based sender/receiver with desktop notifications and NIP-07 signing
+3. **Android app** — <https://github.com/vcavallo/nstrfy-android> — native mobile app with background service
+4. **Custom client** — build your own using the NIP specification
 
 ## Troubleshooting
 
