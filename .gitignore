@@ -1,1 +1,4 @@
 .claude/
+*.cast
+*.gif
+*.env.development.local
