@@ -504,6 +504,45 @@ footer a:hover {
     }
 }
 
+/* Signer bar */
+.signer-bar {
+    margin-top: 16px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.signer-bar .btn-small {
+    background: rgba(255, 255, 255, 0.15);
+    color: white;
+    border: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+.signer-bar .btn-small:hover {
+    background: rgba(255, 255, 255, 0.25);
+}
+
+.signer-status {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: rgba(255, 255, 255, 0.15);
+    padding: 6px 12px;
+    border-radius: 16px;
+    font-size: 0.9em;
+}
+
+.signer-status code {
+    font-family: 'Courier New', monospace;
+    font-size: 0.85em;
+}
+
+.signer-label {
+    opacity: 0.85;
+}
+
 /* Tabs */
 .tabs {
     display: flex;
@@ -532,6 +571,18 @@ footer a:hover {
 .tab.active {
     color: var(--primary-color);
     border-bottom-color: var(--primary-color);
+}
+
+.tab.has-unread::after {
+    content: "";
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--success-color);
+    margin-left: 8px;
+    vertical-align: middle;
+    animation: pulse 2s infinite;
 }
 
 .tab-panel {

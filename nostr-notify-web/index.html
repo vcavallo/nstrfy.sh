@@ -14,6 +14,14 @@
         <header>
             <h1>📬 nstrfy</h1>
             <p class="subtitle">Send &amp; receive push notifications over Nostr</p>
+            <div id="signer-bar" class="signer-bar">
+                <button type="button" id="signer-connect-btn" class="btn btn-small">🔑 Connect signer</button>
+                <span id="signer-status" class="signer-status hidden">
+                    <span class="signer-label">Connected as</span>
+                    <code id="signer-npub"></code>
+                    <button type="button" id="signer-disconnect-btn" class="btn btn-small btn-secondary">Disconnect</button>
+                </span>
+            </div>
         </header>
 
         <nav class="tabs" role="tablist">
@@ -137,7 +145,7 @@ wss://relay.nostr.band</textarea>
             <h2>📖 About</h2>
             <p>nstrfy is a nostr-based push notification system — like <code>ntfy.sh</code> but decentralized. Notifications travel as <a href="https://github.com/vcavallo/nstrfy.sh/blob/master/NIP-DRAFT.md" target="_blank" rel="noopener">kind 7741 events</a> through nostr relays.</p>
             <p><strong>Send</strong> broadcasts a notification (end-to-end encrypted if you supply an npub, public otherwise). <strong>Listen</strong> subscribes to public topics and shows incoming notifications in-browser, firing a desktop notification on match.</p>
-            <p class="help-text">Listen mode currently shows public (unencrypted) notifications only. Encrypted inbox + your-own-key signing come with NIP-07 login (Phase 3).</p>
+            <p class="help-text">Connect a NIP-07 signer (Alby, nos2x, etc.) to decrypt notifications sent to your npub. Without a signer, Listen shows public notifications only.</p>
         </section>
 
         <footer>

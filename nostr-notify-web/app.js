@@ -2,7 +2,7 @@
 // Write: posts form to /api/send (demo signer)
 // Listen: subscribes to kind 7741 firehose on configured relays, filters by topic client-side
 
-import { SimplePool } from 'https://esm.sh/nostr-tools@2.7.0';
+import { SimplePool, nip19 } from 'https://esm.sh/nostr-tools@2.7.0';
 
 // ========================================================================
 // shared helpers
@@ -36,6 +36,62 @@ function formatRelativeTime(unixSeconds) {
 }
 
 // ========================================================================
+// NIP-07 signer (session-only, not persisted)
+// ========================================================================
+
+const signerState = {
+    pubkey: null, // hex
+    npub: null,
+};
+
+const signerConnectBtn = document.getElementById('signer-connect-btn');
+const signerDisconnectBtn = document.getElementById('signer-disconnect-btn');
+const signerStatusEl = document.getElementById('signer-status');
+const signerNpubEl = document.getElementById('signer-npub');
+
+function renderSignerBar() {
+    if (signerState.pubkey) {
+        signerConnectBtn.classList.add('hidden');
+        signerStatusEl.classList.remove('hidden');
+        signerNpubEl.textContent = truncate(signerState.npub, 20);
+        signerNpubEl.title = signerState.npub;
+    } else {
+        signerConnectBtn.classList.remove('hidden');
+        signerStatusEl.classList.add('hidden');
+    }
+}
+
+async function connectSigner() {
+    if (!window.nostr || typeof window.nostr.getPublicKey !== 'function') {
+        showToast('No NIP-07 extension detected. Install Alby, nos2x, or similar.', 'error');
+        return;
+    }
+    try {
+        const pubkey = await window.nostr.getPublicKey();
+        if (!/^[0-9a-f]{64}$/i.test(pubkey)) throw new Error('extension returned invalid pubkey');
+        signerState.pubkey = pubkey.toLowerCase();
+        signerState.npub = nip19.npubEncode(signerState.pubkey);
+        renderSignerBar();
+        showToast('Signer connected', 'success');
+        if (listenState.isListening) restartSubscription();
+    } catch (err) {
+        showToast(`Signer error: ${err.message}`, 'error');
+    }
+}
+
+function disconnectSigner() {
+    signerState.pubkey = null;
+    signerState.npub = null;
+    renderSignerBar();
+    showToast('Signer disconnected', 'info');
+    if (listenState.isListening) restartSubscription();
+}
+
+signerConnectBtn.addEventListener('click', connectSigner);
+signerDisconnectBtn.addEventListener('click', disconnectSigner);
+renderSignerBar();
+
+// ========================================================================
 // tab switcher
 // ========================================================================
 
@@ -50,8 +106,24 @@ document.querySelectorAll('.tab').forEach((btn) => {
         document.querySelectorAll('.tab-panel').forEach((p) => {
             p.classList.toggle('active', p.id === `tab-${target}`);
         });
+        if (target === 'listen') clearListenBadge();
     });
 });
+
+const listenTabBtn = document.querySelector('.tab[data-tab="listen"]');
+
+function isListenTabActive() {
+    return listenTabBtn?.classList.contains('active');
+}
+
+function markListenUnread() {
+    if (isListenTabActive()) return;
+    listenTabBtn?.classList.add('has-unread');
+}
+
+function clearListenBadge() {
+    listenTabBtn?.classList.remove('has-unread');
+}
 
 // ========================================================================
 // WRITE MODE
@@ -284,8 +356,8 @@ function findMatchingSubscription(topic) {
     return listenState.subscriptions.find((s) => s.topic === topic) || null;
 }
 
-function hasPTag(event) {
-    return event.tags.some((t) => t.length >= 2 && t[0] === 'p');
+function getPTags(event) {
+    return event.tags.filter((t) => t.length >= 2 && t[0] === 'p').map((t) => t[1]);
 }
 
 function getExpirationTag(event) {
@@ -293,7 +365,7 @@ function getExpirationTag(event) {
     return t ? Number(t[1]) : null;
 }
 
-function handleEvent(event) {
+async function handleEvent(event) {
     if (listenState.seenIds.has(event.id)) return;
     listenState.seenIds.add(event.id);
     if (listenState.seenIds.size > 2000) {
@@ -301,13 +373,26 @@ function handleEvent(event) {
         listenState.seenIds = new Set(Array.from(listenState.seenIds).slice(-1000));
     }
 
-    // Phase 2: public events only. Encrypted (has #p tag) requires NIP-07 (Phase 3).
-    if (hasPTag(event)) return;
-
+    const pTags = getPTags(event);
     let payload;
-    try {
-        payload = JSON.parse(event.content);
-    } catch {
+    if (pTags.length === 0) {
+        // public event
+        try { payload = JSON.parse(event.content); } catch { return; }
+    } else if (signerState.pubkey && pTags.includes(signerState.pubkey)) {
+        // encrypted to us — decrypt via NIP-07
+        if (!window.nostr?.nip44?.decrypt) {
+            console.warn('NIP-07 extension does not support nip44.decrypt');
+            return;
+        }
+        try {
+            const plaintext = await window.nostr.nip44.decrypt(event.pubkey, event.content);
+            payload = JSON.parse(plaintext);
+        } catch (err) {
+            console.warn('Decrypt failed for event', event.id, err);
+            return;
+        }
+    } else {
+        // p-tagged but not for us
         return;
     }
 
@@ -335,6 +420,7 @@ function handleEvent(event) {
 
     addToFeed(notification);
     fireBrowserNotification(notification);
+    markListenUnread();
 }
 
 // ---- browser notifications ----------------------------------------------
@@ -406,11 +492,15 @@ async function startListening() {
     updateStatus('connecting');
     listenState.pool = new SimplePool();
 
-    const filter = { kinds: [7741], since: Math.floor(Date.now() / 1000) };
+    const sinceNow = Math.floor(Date.now() / 1000);
+    const filters = [{ kinds: [7741], since: sinceNow }];
+    if (signerState.pubkey) {
+        filters.push({ kinds: [7741], '#p': [signerState.pubkey], since: sinceNow });
+    }
     try {
         listenState.sub = listenState.pool.subscribeMany(
             listenState.relays,
-            [filter],
+            filters,
             {
                 onevent: handleEvent,
                 oneose: () => updateStatus('connected'),
