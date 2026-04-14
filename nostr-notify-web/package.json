@@ -1,0 +1,11 @@
+{
+  "name": "nstrfy-web",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "nstrfy web client — Write mode + demo signing function",
+  "dependencies": {
+    "nostr-tools": "^2.7.0",
+    "ws": "^8.18.0"
+  }
+}

@@ -504,6 +504,61 @@ footer a:hover {
     }
 }
 
+/* Write-mode additions */
+select {
+    width: 100%;
+    padding: 12px;
+    border: 2px solid var(--border);
+    border-radius: 8px;
+    font-size: 1em;
+    background: white;
+    cursor: pointer;
+}
+
+select:focus {
+    outline: none;
+    border-color: var(--primary-color);
+}
+
+input[type="range"] {
+    width: 100%;
+    accent-color: var(--primary-color);
+}
+
+.form-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+}
+
+.help-inline {
+    font-weight: normal;
+    font-size: 0.85em;
+    color: var(--text-secondary);
+}
+
+.relay-list {
+    list-style: none;
+    padding: 0;
+    margin: 8px 0 12px;
+}
+
+.relay-list li {
+    padding: 6px 0;
+    font-size: 0.9em;
+}
+
+#result-eventid {
+    word-break: break-all;
+    font-size: 0.85em;
+}
+
+@media (max-width: 640px) {
+    .form-row {
+        grid-template-columns: 1fr;
+    }
+}
+
 /* Scrollbar Styling */
 .notifications-list::-webkit-scrollbar {
     width: 8px;
