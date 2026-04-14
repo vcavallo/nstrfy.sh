@@ -12,7 +12,7 @@ const DEFAULT_RELAYS = [
 ];
 
 const VALID_PRIORITIES = new Set(['urgent', 'high', 'default', 'low', 'min']);
-const TOPIC_RE = /^[A-Za-z0-9._-]*$/;
+const TOPIC_RE = /^[A-Za-z0-9._-]+$/;
 const RELAY_RE = /^wss:\/\/[A-Za-z0-9.-]+(?::\d+)?(\/.*)?$/;
 const HEX64_RE = /^[0-9a-f]{64}$/i;
 
@@ -55,10 +55,8 @@ function validate(body) {
   if (typeof body.message !== 'string' || body.message.length < 1 || body.message.length > 2000) {
     return 'message: required string, 1–2000 chars';
   }
-  if (body.topic != null) {
-    if (typeof body.topic !== 'string' || body.topic.length > 100 || !TOPIC_RE.test(body.topic)) {
-      return 'topic: 0–100 chars, [A-Za-z0-9._-]';
-    }
+  if (typeof body.topic !== 'string' || body.topic.length < 1 || body.topic.length > 100 || !TOPIC_RE.test(body.topic)) {
+    return 'topic: required, 1–100 chars, [A-Za-z0-9._-]';
   }
   if (body.priority != null && !VALID_PRIORITIES.has(body.priority)) {
     return 'priority: one of urgent|high|default|low|min';

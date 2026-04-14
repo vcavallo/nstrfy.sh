@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>nstrfy — Send a Nostr Notification</title>
+    <title>nstrfy — Nostr Notifications</title>
     <link rel="stylesheet" href="styles.css">
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#6200EE">
@@ -13,75 +13,131 @@
     <div class="container">
         <header>
             <h1>📬 nstrfy</h1>
-            <p class="subtitle">Send a push notification over Nostr</p>
+            <p class="subtitle">Send &amp; receive push notifications over Nostr</p>
         </header>
 
-        <section class="card">
-            <h2>✉️ Send</h2>
-            <form id="send-form">
-                <div class="form-group">
-                    <label for="to">Recipient npub <span class="help-inline">(optional — leave blank for a public notification)</span></label>
-                    <input type="text" id="to" name="to" class="mono-input" placeholder="npub1... or 64-char hex" autocomplete="off">
-                </div>
+        <nav class="tabs" role="tablist">
+            <button type="button" class="tab active" data-tab="write" role="tab" aria-selected="true">✉️ Send</button>
+            <button type="button" class="tab" data-tab="listen" role="tab" aria-selected="false">🔔 Listen</button>
+        </nav>
 
-                <div class="form-group">
-                    <label for="topic">Topic <span class="help-inline">(optional)</span></label>
-                    <input type="text" id="topic" name="topic" placeholder="e.g. alerts" maxlength="100" autocomplete="off">
-                </div>
-
-                <div class="form-group">
-                    <label for="title">Title</label>
-                    <input type="text" id="title" name="title" required maxlength="200" placeholder="Deploy complete">
-                </div>
-
-                <div class="form-group">
-                    <label for="message">Message</label>
-                    <textarea id="message" name="message" required maxlength="2000" rows="4" placeholder="v2.0 is live"></textarea>
-                </div>
-
-                <div class="form-row">
+        <!-- ================= WRITE TAB ================= -->
+        <div id="tab-write" class="tab-panel active">
+            <section class="card">
+                <h2>✉️ Send a notification</h2>
+                <form id="send-form">
                     <div class="form-group">
-                        <label for="priority">Priority</label>
-                        <select id="priority" name="priority">
-                            <option value="min">min</option>
-                            <option value="low">low</option>
-                            <option value="default" selected>default</option>
-                            <option value="high">high</option>
-                            <option value="urgent">urgent</option>
-                        </select>
+                        <label for="to">Recipient npub <span class="help-inline">(optional — leave blank for a public notification)</span></label>
+                        <input type="text" id="to" name="to" class="mono-input" placeholder="npub1... or 64-char hex" autocomplete="off">
                     </div>
 
                     <div class="form-group">
-                        <label for="expiration">Expiration: <span id="expiration-label">1h</span></label>
-                        <input type="range" id="expiration" name="expiration" min="300" max="86400" step="300" value="3600">
+                        <label for="topic">Topic</label>
+                        <input type="text" id="topic" name="topic" required placeholder="e.g. alerts" maxlength="100" pattern="[A-Za-z0-9._\-]+" autocomplete="off">
                     </div>
+
+                    <div class="form-group">
+                        <label for="title">Title</label>
+                        <input type="text" id="title" name="title" required maxlength="200" placeholder="Deploy complete">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="message">Message</label>
+                        <textarea id="message" name="message" required maxlength="2000" rows="4" placeholder="v2.0 is live"></textarea>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="priority">Priority</label>
+                            <select id="priority" name="priority">
+                                <option value="min">min</option>
+                                <option value="low">low</option>
+                                <option value="default" selected>default</option>
+                                <option value="high">high</option>
+                                <option value="urgent">urgent</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="expiration">Expiration: <span id="expiration-label">1h</span></label>
+                            <input type="range" id="expiration" name="expiration" min="300" max="86400" step="300" value="3600">
+                        </div>
+                    </div>
+
+                    <div class="button-group">
+                        <button type="submit" id="send-btn" class="btn btn-primary">🚀 Send</button>
+                    </div>
+                </form>
+            </section>
+
+            <section id="result-card" class="card hidden">
+                <h2>✅ Published</h2>
+                <div class="info-box">
+                    <p><strong>Event ID</strong></p>
+                    <div class="pubkey-container">
+                        <code id="result-eventid"></code>
+                    </div>
+                    <p><a id="result-njump" href="#" target="_blank" rel="noopener">View on njump.me ↗</a></p>
+                    <p><strong>Relays</strong></p>
+                    <ul id="result-relays" class="relay-list"></ul>
+                    <p class="help-text">Sent as <code id="result-sender"></code></p>
+                </div>
+            </section>
+        </div>
+
+        <!-- ================= LISTEN TAB ================= -->
+        <div id="tab-listen" class="tab-panel">
+            <section class="card">
+                <div class="section-header">
+                    <h2>🔔 Listen</h2>
+                    <div class="status-bar">
+                        <span id="listen-indicator" class="status-indicator status-disconnected"></span>
+                        <span id="listen-status-text">Not listening</span>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>Topics</label>
+                    <ul id="topics-list" class="topics-list"></ul>
+                    <div class="input-with-button">
+                        <input type="text" id="topic-add-input" placeholder="topic name (e.g. alerts)" maxlength="100" pattern="[A-Za-z0-9._\-]+" autocomplete="off">
+                        <button type="button" id="topic-add-btn" class="btn btn-secondary">+ Add</button>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="listen-relays">Relays <span class="help-inline">(one per line)</span></label>
+                    <textarea id="listen-relays" class="mono-input" rows="3">wss://relay.damus.io
+wss://nos.lol
+wss://relay.nostr.band</textarea>
                 </div>
 
                 <div class="button-group">
-                    <button type="submit" id="send-btn" class="btn btn-primary">🚀 Send</button>
+                    <button type="button" id="listen-start-btn" class="btn btn-success">▶️ Start listening</button>
+                    <button type="button" id="listen-stop-btn" class="btn btn-danger hidden">⏹️ Stop</button>
+                    <button type="button" id="clear-feed-btn" class="btn btn-secondary">🗑️ Clear feed</button>
                 </div>
-            </form>
-        </section>
+            </section>
 
-        <section id="result-card" class="card hidden">
-            <h2>✅ Published</h2>
-            <div class="info-box">
-                <p><strong>Event ID</strong></p>
-                <div class="pubkey-container">
-                    <code id="result-eventid"></code>
+            <section class="card">
+                <div class="section-header">
+                    <h2>📨 Feed</h2>
+                    <span id="feed-count" class="help-text">0 notifications</span>
                 </div>
-                <p><a id="result-njump" href="#" target="_blank" rel="noopener">View on njump.me ↗</a></p>
-                <p><strong>Accepted by</strong></p>
-                <ul id="result-relays" class="relay-list"></ul>
-                <p class="help-text">Sent as <code id="result-sender"></code></p>
-            </div>
-        </section>
+                <div id="feed" class="notifications-list">
+                    <div class="empty-state">
+                        <p>No notifications yet</p>
+                        <p class="help-text">Click "Start listening" to subscribe.</p>
+                    </div>
+                </div>
+            </section>
+        </div>
 
         <section class="card instructions">
             <h2>📖 About</h2>
             <p>nstrfy is a nostr-based push notification system — like <code>ntfy.sh</code> but decentralized. Notifications travel as <a href="https://github.com/vcavallo/nstrfy.sh/blob/master/NIP-DRAFT.md" target="_blank" rel="noopener">kind 7741 events</a> through nostr relays.</p>
-            <p>Fill out the form and hit Send. If you supply a recipient npub, the message is end-to-end encrypted (NIP-44). Without a recipient, it's a public broadcast to anyone listening on the topic.</p>
-            <p class="help-text">This page signs events with a shared demo identity. Listen mode and your-own-key signing are coming in later phases. See the <a href="https://github.com/vcavallo/nstrfy.sh" target="_blank" rel="noopener">repo</a>.</p>
+            <p><strong>Send</strong> broadcasts a notification (end-to-end encrypted if you supply an npub, public otherwise). <strong>Listen</strong> subscribes to public topics and shows incoming notifications in-browser, firing a desktop notification on match.</p>
+            <p class="help-text">Listen mode currently shows public (unencrypted) notifications only. Encrypted inbox + your-own-key signing come with NIP-07 login (Phase 3).</p>
         </section>
 
         <footer>
